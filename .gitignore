@@ -1,0 +1,15 @@
+# Virtual Environment
+game_env/
+
+# Pyhon cache files we don't want to commit
+__pycache__/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# API Keys and such
+secrets.json
