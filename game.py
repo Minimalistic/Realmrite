@@ -1,6 +1,4 @@
 import pygame
-import socket
-import threading
 import tkinter as tk
 from tkinter import scrolledtext
 import os
@@ -10,33 +8,40 @@ pygame.init()
 
 # Constants
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
-PLAYER_SIZE = 50
+GRID_SIZE = 40  # Size of each grid cell
+GRID_WIDTH = SCREEN_WIDTH // GRID_SIZE
+GRID_HEIGHT = SCREEN_HEIGHT // GRID_SIZE
 FPS = 30
 
 # Colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
+GRAY = (200, 200, 200)
 
 # Player class
 class Player(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, grid_x, grid_y):
         super().__init__()
-        self.image = pygame.Surface((PLAYER_SIZE, PLAYER_SIZE))
+        self.image = pygame.Surface((GRID_SIZE, GRID_SIZE))
         self.image.fill(RED)
         self.rect = self.image.get_rect()
-        self.rect.topleft = (x, y)
-        self.speed = 5
+        self.grid_x = grid_x
+        self.grid_y = grid_y
+        self.update_position()
 
-    def update(self, keys):
-        if keys[pygame.K_LEFT]:
-            self.rect.x -= self.speed
-        if keys[pygame.K_RIGHT]:
-            self.rect.x += self.speed
-        if keys[pygame.K_UP]:
-            self.rect.y -= self.speed
-        if keys[pygame.K_DOWN]:
-            self.rect.y += self.speed
+    def update_position(self):
+        self.rect.x = self.grid_x * GRID_SIZE
+        self.rect.y = self.grid_y * GRID_SIZE
+
+    def move(self, dx, dy):
+        new_x = max(0, min(GRID_WIDTH - 1, self.grid_x + dx))
+        new_y = max(0, min(GRID_HEIGHT - 1, self.grid_y + dy))
+        if (new_x, new_y) != (self.grid_x, self.grid_y):
+            self.grid_x, self.grid_y = new_x, new_y
+            self.update_position()
+            return True
+        return False
 
 # Game class
 class Game:
@@ -65,7 +70,7 @@ class Game:
         pygame.display.set_caption("Realmrite MVP")
         self.clock = pygame.time.Clock()
         self.running = True
-        self.player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        self.player = Player(GRID_WIDTH // 2, GRID_HEIGHT // 2)
         self.all_sprites = pygame.sprite.Group(self.player)
 
         # Bind Tab key to switch focus
@@ -95,21 +100,25 @@ class Game:
         return 'break'  # This prevents the default Tab behavior
 
     def focus_pygame_window(self):
-        # Focus on the Pygame window to capture keyboard events
         pygame.display.get_wm_info()
         self.embed.focus_set()
 
     def on_key_press(self, event):
         if self.focus_on_pygame:
+            dx, dy = 0, 0
             if event.keysym == 'Left':
-                self.player.rect.x -= self.player.speed
+                dx = -1
             elif event.keysym == 'Right':
-                self.player.rect.x += self.player.speed
+                dx = 1
             elif event.keysym == 'Up':
-                self.player.rect.y -= self.player.speed
+                dy = -1
             elif event.keysym == 'Down':
-                self.player.rect.y += self.player.speed
-            self.update_cli_text(f"Player moved {event.keysym}\n")
+                dy = 1
+            
+            if self.player.move(dx, dy):
+                self.update_cli_text(f"Player moved {event.keysym}\n")
+            else:
+                self.update_cli_text(f"Cannot move {event.keysym}\n")
 
     def run(self):
         while self.running:
@@ -125,12 +134,19 @@ class Game:
                 self.running = False
 
     def update(self):
-        self.all_sprites.update(pygame.key.get_pressed())
+        self.all_sprites.update()
 
     def draw(self):
         self.screen.fill(WHITE)
+        self.draw_grid()
         self.all_sprites.draw(self.screen)
         pygame.display.flip()
+
+    def draw_grid(self):
+        for x in range(0, SCREEN_WIDTH, GRID_SIZE):
+            pygame.draw.line(self.screen, GRAY, (x, 0), (x, SCREEN_HEIGHT))
+        for y in range(0, SCREEN_HEIGHT, GRID_SIZE):
+            pygame.draw.line(self.screen, GRAY, (0, y), (SCREEN_WIDTH, y))
 
     def process_command(self, event):
         command = self.cli_entry.get()
