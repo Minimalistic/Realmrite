@@ -19,7 +19,26 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GRAY = (200, 200, 200)
 
-# Player class
+class Button:
+    def __init__(self, x, y, width, height, text, color, text_color, action):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.color = color
+        self.text_color = text_color
+        self.action = action
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, self.color, self.rect)
+        font = pygame.font.Font(None, 36)
+        text = font.render(self.text, True, self.text_color)
+        text_rect = text.get_rect(center=self.rect.center)
+        screen.blit(text, text_rect)
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.rect.collidepoint(event.pos):
+                self.action()
+
 class Player(pygame.sprite.Sprite):
     def __init__(self, grid_x, grid_y):
         super().__init__()
@@ -43,7 +62,6 @@ class Player(pygame.sprite.Sprite):
             return True
         return False
 
-# Game class
 class Game:
     def __init__(self, root):
         self.root = root
@@ -70,8 +88,8 @@ class Game:
         pygame.display.set_caption("Realmrite MVP")
         self.clock = pygame.time.Clock()
         self.running = True
-        self.player = Player(GRID_WIDTH // 2, GRID_HEIGHT // 2)
-        self.all_sprites = pygame.sprite.Group(self.player)
+        self.player = None
+        self.all_sprites = pygame.sprite.Group()
 
         # Bind Tab key to switch focus
         self.root.bind("<Tab>", self.switch_focus)
@@ -89,6 +107,37 @@ class Game:
         self.update_cli_text("Press Tab to switch focus between the game and the CLI.\n")
         self.update_cli_text("Enter commands in the CLI and press Enter.\n")
 
+        self.state = "MENU"
+        self.setup_menu()
+
+    def setup_menu(self):
+        button_width, button_height = 200, 50
+        start_x = (SCREEN_WIDTH - button_width) // 2
+        start_y = SCREEN_HEIGHT // 2 - 100
+
+        self.menu_buttons = [
+            Button(start_x, start_y, button_width, button_height, "New Game", (0, 255, 0), BLACK, self.start_new_game),
+            Button(start_x, start_y + 60, button_width, button_height, "Continue", (0, 200, 0), BLACK, self.continue_game),
+            Button(start_x, start_y + 120, button_width, button_height, "Settings", (0, 150, 0), BLACK, self.open_settings),
+            Button(start_x, start_y + 180, button_width, button_height, "Exit", (255, 0, 0), BLACK, self.exit_game)
+        ]
+
+    def start_new_game(self):
+        self.state = "PLAYING"
+        self.player = Player(GRID_WIDTH // 2, GRID_HEIGHT // 2)
+        self.all_sprites = pygame.sprite.Group(self.player)
+        self.update_cli_text("Starting a new game...\n")
+
+    def continue_game(self):
+        self.update_cli_text("Continue game pressed. This feature is not implemented yet.\n")
+
+    def open_settings(self):
+        self.update_cli_text("Settings pressed. This feature is not implemented yet.\n")
+
+    def exit_game(self):
+        self.running = False
+        self.update_cli_text("Exiting game...\n")
+
     def switch_focus(self, event):
         if self.focus_on_pygame:
             self.cli_entry.focus_set()
@@ -104,7 +153,7 @@ class Game:
         self.embed.focus_set()
 
     def on_key_press(self, event):
-        if self.focus_on_pygame:
+        if self.focus_on_pygame and self.state == "PLAYING":
             dx, dy = 0, 0
             if event.keysym == 'Left':
                 dx = -1
@@ -132,14 +181,25 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+            if self.state == "MENU":
+                for button in self.menu_buttons:
+                    button.handle_event(event)
+            elif self.state == "PLAYING":
+                # Handle game events
+                pass
 
     def update(self):
-        self.all_sprites.update()
+        if self.state == "PLAYING":
+            self.all_sprites.update()
 
     def draw(self):
         self.screen.fill(WHITE)
-        self.draw_grid()
-        self.all_sprites.draw(self.screen)
+        if self.state == "MENU":
+            for button in self.menu_buttons:
+                button.draw(self.screen)
+        elif self.state == "PLAYING":
+            self.draw_grid()
+            self.all_sprites.draw(self.screen)
         pygame.display.flip()
 
     def draw_grid(self):
@@ -152,8 +212,12 @@ class Game:
         command = self.cli_entry.get()
         self.cli_entry.delete(0, tk.END)
         self.update_cli_text(f"You entered: {command}\n")
-        # Process the command (for now, just print it)
-        print(f"Command entered: {command}")
+        
+        if command.lower() == "exit":
+            self.exit_game()
+        else:
+            # Process other commands (for now, just print it)
+            print(f"Command entered: {command}")
 
     def update_cli_text(self, text):
         self.cli_text.insert(tk.END, text)
